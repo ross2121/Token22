@@ -1,6 +1,11 @@
 use anchor_lang::prelude::*;
 
-declare_id!("AwovFVc8D64taLRrHjmg4ZeNSh6xnZGTbd2Arv6kbcwd");
+use anchor_spl::{
+    associated_token::AssociatedToken, 
+    token_interface::{Mint as InterfaceMint, TokenAccount as InterfaceTokenAccount, TokenInterface, TransferChecked,transfer_checked}
+};
+use spl_transfer_hook_interface::instruction::{TransferHookInstruction};
+declare_id!("3D6uyMfYh3s315PgTRJQNsTNYfThWKoCfUaG1we6ZC8c");
 pub mod instructions;
 pub use instructions::*;
 pub mod state;
@@ -20,14 +25,16 @@ pub mod amm {
     ) -> Result<()> {
         ctx.accounts.initialize(seed, fee, authority, &ctx.bumps)
     }
-
+    pub fn initialize_extra_account_meta_list(
+        ctx: Context<InitializeExtraAccountMetaList>,
+    ) -> Result<()> {
+        ctx.accounts.initialize(ctx.bumps,*ctx.program_id)
+    }
     pub fn deposit(
         ctx: Context<Deposit>,
-        amount: u64,
-        max_x: u64,
-        max_y: u64
+        sol_amount: u64, token_amount: u64, max_sol: u64, max_token: u64
     ) -> Result<()> {
-        ctx.accounts.deposit(amount, max_x, max_y)
+        ctx.accounts.deposit(sol_amount,token_amount,max_sol,max_token)
     }
 
     pub fn swap(
@@ -38,6 +45,7 @@ pub mod amm {
     ) -> Result<()> {
         ctx.accounts.swap(amount, is_x, min_receive)
     }
+ 
 
     pub fn withdraw(
         ctx: Context<Withdraw>,
@@ -47,5 +55,79 @@ pub mod amm {
     ) -> Result<()> {
         ctx.accounts.withdraw(amount, min_x, min_y)
     }
+    pub fn transfer_hook(ctx: Context<TransferHook>, amount: u64) -> Result<()> {   
+        let signer_seeds: &[&[&[u8]]] = &[&[
+            b"config",
+            &ctx.accounts.config.seed.to_le_bytes(),
+            &[ctx.accounts.config.config_bump]
+        ]];
+        
+        let cpi_accounts = TransferChecked {
+            from: ctx.accounts.sender_wsol_token_account.to_account_info(),
+            mint: ctx.accounts.wsol_mint.to_account_info(),
+            to: ctx.accounts.wsol_vault.to_account_info(),
+            authority: ctx.accounts.config.to_account_info(),
+        };
+        
+        let cpi_program = ctx.accounts.token_program.to_account_info();
+        let cpi_ctx = CpiContext::new(cpi_program, cpi_accounts).with_signer(signer_seeds);
+        
+        transfer_checked(cpi_ctx, amount, ctx.accounts.wsol_mint.decimals)?;
+        
+        Ok(())
+    }
+    pub fn fallback<'info>(
+        program_id: &Pubkey,
+        accounts: &'info [AccountInfo<'info>],
+        data: &[u8],
+    ) -> Result<()> {
+        let instruction = TransferHookInstruction::unpack(data)?;
+    
+        // match instruction discriminator to transfer hook interface execute instruction
+        // token2022 program CPIs this instruction on token transfer
+        match instruction {
+            TransferHookInstruction::Execute { amount } => {
+                let amount_bytes = amount.to_le_bytes();
+    
+                // invoke custom transfer hook instruction on our program
+                __private::__global::transfer_hook(program_id, accounts, &amount_bytes)
+            }
+            _ => return Err(ProgramError::InvalidInstructionData.into()),
+        }
+    }
 }
-
+#[derive(Accounts)]
+pub struct TransferHook<'info> {
+    #[account(
+        token::mint = mint,
+        token::authority = owner,
+    )]
+    pub source_token: InterfaceAccount<'info, InterfaceTokenAccount>,
+    pub mint: InterfaceAccount<'info, InterfaceMint>,
+    #[account(
+        token::mint = mint,
+    )]
+    pub destination_token: InterfaceAccount<'info, InterfaceTokenAccount>,
+    /// CHECK: source token account owner, can be SystemAccount or PDA owned by another program
+    pub owner: UncheckedAccount<'info>,
+    /// CHECK: ExtraAccountMetaList Account,
+    #[account(
+        seeds = [b"extra-account-metas", mint.key().as_ref()],
+        bump
+    )]
+    pub extra_account_meta_list: UncheckedAccount<'info>,
+    pub wsol_mint: InterfaceAccount<'info, InterfaceMint>,
+    pub token_program: Interface<'info,TokenInterface>,
+    pub associated_token_program: Program<'info, AssociatedToken>,
+    #[account(mut, associated_token::mint=wsol_mint, associated_token::authority=config)]
+    pub wsol_vault: InterfaceAccount<'info, InterfaceTokenAccount>,
+    #[account(seeds=[b"config",config.seed.to_le_bytes().as_ref()],bump)]
+    pub config:Account<'info,config>,
+    #[account(
+        mut,
+        token::mint = wsol_mint,
+        token::authority = owner,
+    )]
+    pub sender_wsol_token_account: InterfaceAccount<'info, InterfaceTokenAccount>,
+    pub system_program:Program<'info,System>
+}

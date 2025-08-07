@@ -12,17 +12,15 @@ pub signer:Signer<'info>,
 pub token_mint: Account<'info, Mint>,  
     pub wsol_mint: Account<'info, Mint>,
     #[account(mut)]
-    pub user_token: Account<'info, TokenAccount>,  // User's Token-2022 account
-    #[account(mut)]
-    pub user_sol: AccountInfo<'info>,              // User's SOL account
+    pub user_token: Account<'info, TokenAccount>,  // User's Token-2022 accoun             // User's SOL account
     #[account(mut)]
     pub user_wsol: Account<'info, TokenAccount>,
 #[account(mut,seeds=[b"lp",config.key().as_ref()],bump=config.lp_bump)]
 pub lp_token:Account<'info,Mint>,
-
 #[account(mut, associated_token::mint=token_mint, associated_token::authority=config)]
 pub token_vault: Account<'info, TokenAccount>,
 #[account(mut, seeds=[b"sol_vault", config.key().as_ref()], bump=config.sol_vault_bump)]
+    /// CHECK: This is the user's SOL account, checked in the instruction logic.
 pub sol_vault: AccountInfo<'info>,
 #[account(mut,seeds=[b"config",config.seed.to_le_bytes().as_ref()],bump=config.config_bump)]
 pub config:Account<'info,config>,
@@ -30,11 +28,10 @@ pub config:Account<'info,config>,
     seeds = [b"extra-account-metas", token_mint.key().as_ref()],
     bump
 )]
+    /// CHECK: This is the user's SOL account, checked in the instruction logic.
 pub extra_account_meta_list: UncheckedAccount<'info>,
-#[account(seeds=[b"delegate"], bump)]
-pub delegate: SystemAccount<'info>,
-#[account(mut, token::mint=wsol_mint, token::authority=delegate)]
-pub delegate_wsol: Account<'info, TokenAccount>,
+#[account(mut, associated_token::mint=wsol_mint, associated_token::authority=config)]
+pub wsol_vault: Account<'info, TokenAccount>,
 pub system_program:Program<'info,System>,
 pub token_program:Program<'info,Token>,
 pub token_2022_program: Program<'info, Token2022>,
@@ -44,8 +41,7 @@ impl<'info>  Swap <'info>{
     pub fn swap(&mut self, amount: u64, is_sol_to_token: bool, min_receive: u64) -> Result<()> {
         require!(self.config.locked == false, AmmError::PoolLocked);
         require!(amount != 0, AmmError::InvalidAmount);
-        
-        // Get current balances
+    
         let sol_balance = self.sol_vault.lamports();
         let token_balance = self.token_vault.amount;
         
@@ -69,11 +65,11 @@ impl<'info>  Swap <'info>{
         require!(swap_result.deposit != 0 || swap_result.withdraw != 0, AmmError::InvalidAmount);
         
         if is_sol_to_token {
-            // User swaps SOL for Token-2022
+    
             self.transfer_sol_to_vault(swap_result.deposit)?;
             self.transfer_token_from_vault(swap_result.withdraw)?;
         } else {
-            // User swaps Token-2022 for SOL
+        
             self.transfer_token_to_vault(swap_result.deposit)?;
             self.transfer_sol_from_vault(swap_result.withdraw)?;
         }    
@@ -82,7 +78,7 @@ impl<'info>  Swap <'info>{
     pub fn transfer_sol_from_vault(&self, amount: u64) -> Result<()> {
         let transfer_instruction = anchor_lang::system_program::Transfer {
             from: self.sol_vault.to_account_info(),
-            to: self.user_sol.to_account_info(),
+            to: self.signer.to_account_info(),
         };
         let seed_config=&self.config.key();
         let seeds = &[
@@ -105,7 +101,7 @@ impl<'info>  Swap <'info>{
 
     pub fn transfer_sol_to_vault(&self, amount: u64) -> Result<()> {
         let transfer_instruction = anchor_lang::system_program::Transfer {
-            from: self.user_sol.to_account_info(),
+            from: self.signer.to_account_info(),
             to: self.sol_vault.to_account_info(),
         };
         

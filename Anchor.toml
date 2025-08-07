@@ -6,7 +6,7 @@ resolution = true
 skip-lint = false
 
 [programs.localnet]
-amm = "AwovFVc8D64taLRrHjmg4ZeNSh6xnZGTbd2Arv6kbcwd"
+amm = "3D6uyMfYh3s315PgTRJQNsTNYfThWKoCfUaG1we6ZC8c"
 
 [registry]
 url = "https://api.apr.dev"

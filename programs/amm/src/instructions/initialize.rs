@@ -2,7 +2,7 @@ use anchor_lang::{
     prelude::*,
     system_program::{create_account, CreateAccount},
 };
-use anchor_spl::{associated_token::AssociatedToken, token::{Mint, Token, TokenAccount}};
+use anchor_spl::{associated_token::AssociatedToken, token_2022::Token2022, token_interface::{Mint as InterfaceMint, TokenAccount as InterfaceTokenAccount, TokenInterface}};
 use spl_tlv_account_resolution::{
     account::ExtraAccountMeta, seeds::Seed, state::ExtraAccountMetaList,
 };
@@ -16,25 +16,21 @@ pub struct Initialize<'info>{
       /// CHECK: ExtraAccountMetaList Account for storing transfer hook metadata
       #[account(mut,seeds=[b"extra-account-metas",mint.key().as_ref()],bump)]
       pub extra_account_meta_list:AccountInfo<'info>,
- pub mint:Account<'info,Mint>,
- pub wsol_mint:Account<'info,Mint>,
- #[account(init,seeds=[b"lp",config.key().as_ref()],bump,mint::decimals=6,mint::authority=config,payer=signer)]
-pub lp_token:Account<'info,Mint>,
- #[account(mut)]
- pub user_wsol: Account<'info, TokenAccount>,
- #[account(init_if_needed, associated_token::mint=lp_token, associated_token::authority=signer, payer=signer)]
- pub user_lp: Account<'info, TokenAccount>,
-
+ pub mint:InterfaceAccount<'info, InterfaceMint>,
+ pub wsol_mint:InterfaceAccount<'info, InterfaceMint>,
+#[account(init,seeds=[b"lp",config.key().as_ref()],bump,mint::decimals=6,mint::authority=config,payer=signer)]
+pub lp_token:InterfaceAccount<'info, InterfaceMint>,
 #[account(init,associated_token::mint=mint,associated_token::authority=config,payer=signer)]
-pub vault:Account<'info,TokenAccount>,
+pub vault:InterfaceAccount<'info, InterfaceTokenAccount>,
 #[account(init, seeds=[b"sol_vault", config.key().as_ref()], bump, payer=signer, space=0)]
+    /// CHECK: This is the user's SOL account, checked in the instruction logic.
 pub sol_vault: AccountInfo<'info>,
 #[account(init, associated_token::mint=wsol_mint, associated_token::authority=config, payer=signer)]
-pub wsol_vault: Account<'info, TokenAccount>,
+pub wsol_vault: InterfaceAccount<'info, InterfaceTokenAccount>,
 #[account(init,seeds=[b"config",seeds.to_le_bytes().as_ref()],bump,payer=signer,space=8+config::INIT_SPACE)]
 pub config:Account<'info,config>,
 pub system_program:Program<'info,System>,
-pub token_program:Program<'info,Token>,
+pub token_program:Interface<'info,TokenInterface>,
 pub associated_token_program:Program<'info,AssociatedToken>
 }
 impl<'info>  Initialize <'info>{

@@ -6,13 +6,8 @@ pub struct Deposit<'info>{
     #[account(mut)]
     pub signer: Signer<'info>,
     pub token_mint: Account<'info, Mint>,
-    pub wsol_mint: Account<'info, Mint>,
     #[account(mut)]
     pub user_token: Account<'info, TokenAccount>,
-    #[account(mut)]
-    pub user_sol: AccountInfo<'info>,
-    #[account(mut)]
-    pub user_wsol: Account<'info, TokenAccount>,
     #[account(init_if_needed, associated_token::mint=lp_token, associated_token::authority=signer, payer=signer)]
     pub user_lp: Account<'info, TokenAccount>,
     #[account(mut, seeds=[b"lp", config.key().as_ref()], bump=config.lp_bump)]
@@ -20,9 +15,8 @@ pub struct Deposit<'info>{
     #[account(mut, associated_token::mint=token_mint, associated_token::authority=config)]
     pub token_vault: Account<'info, TokenAccount>,
     #[account(mut, seeds=[b"sol_vault", config.key().as_ref()], bump=config.sol_vault_bump)]
+        /// CHECK: This is the user's SOL account, checked in the instruction logic.
     pub sol_vault: AccountInfo<'info>,
-    #[account(mut, associated_token::mint=wsol_mint, associated_token::authority=config)]
-    pub wsol_vault: Account<'info, TokenAccount>,
     #[account(mut, seeds=[b"config", config.seed.to_le_bytes().as_ref()], bump=config.config_bump)]
     pub config: Account<'info, config>,
     pub system_program: Program<'info, System>,
@@ -57,23 +51,23 @@ impl<'info>  Deposit <'info>{
       // Transfer SOL to vault
       if deposit_sol > 0 {
         let  account=Transfer{
-            from:self.user_sol.to_account_info(),
+            from:self.signer.to_account_info(),
             to:self.sol_vault.to_account_info()
         };
         let cpicontex=CpiContext::new(self.system_program.to_account_info(), account);
-        transfer(cpicontex,deposit_sol);
+        transfer(cpicontex,deposit_sol)?;
     }
     
     // Transfer Token-2022 to vault
     if deposit_token > 0 {
         let  account=TransferChecked{
-            from:self.user_sol.to_account_info(),
+            from:self.signer.to_account_info(),
             to:self.sol_vault.to_account_info(),
             authority:self.config.to_account_info(),
             mint:self.token_mint.to_account_info()
         };
         let cpicontex=CpiContext::new(self.token_program.to_account_info(), account);
-        transfer_checked(cpicontex,deposit_sol,self.token_mint.decimals);
+        transfer_checked(cpicontex,deposit_sol,self.token_mint.decimals)?;
     }
     let lp_amount = if self.lp_token.supply == 0 {
         (deposit_sol + deposit_token) / 2  // Simple initial LP calculation
@@ -83,7 +77,7 @@ impl<'info>  Deposit <'info>{
         let token_contribution = (deposit_token as f64 / token_balance as f64) * self.lp_token.supply as f64;
         (sol_contribution + token_contribution) as u64 / 2
     };
-    self.mint(lp_amount);
+    self.mint(lp_amount)?;
     Ok(())
 
 }
