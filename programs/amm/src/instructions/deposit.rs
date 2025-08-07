@@ -1,12 +1,7 @@
 use anchor_lang::{prelude::*,system_program::{Transfer,transfer}};
 use anchor_spl::{associated_token::AssociatedToken, token::{mint_to, transfer_checked, Mint, MintTo, Token, TokenAccount,TransferChecked}, token_2022::Token2022};
-use constant_product_curve::ConstantProduct;
-
 use crate::{config, error::AmmError};
-
-
 #[derive(Accounts)]
-
 pub struct Deposit<'info>{
     #[account(mut)]
     pub signer: Signer<'info>,
