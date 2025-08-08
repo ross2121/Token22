@@ -23,7 +23,7 @@ pub mod amm {
         fee: u16,
         authority: Option<Pubkey>
     ) -> Result<()> {
-        ctx.accounts.initialize(seed, fee, authority, &ctx.bumps)
+        ctx.accounts.initialize(seed, fee, authority, &ctx.bumps, &ctx.remaining_accounts)
     }
     pub fn initialize_extra_account_meta_list(
         ctx: Context<InitializeExtraAccountMetaList>,
@@ -56,24 +56,15 @@ pub mod amm {
         ctx.accounts.withdraw(amount, min_x, min_y)
     }
     pub fn transfer_hook(ctx: Context<TransferHook>, amount: u64) -> Result<()> {   
-        let signer_seeds: &[&[&[u8]]] = &[&[
-            b"config",
-            &ctx.accounts.config.seed.to_le_bytes(),
-            &[ctx.accounts.config.config_bump]
-        ]];
+        msg!("Transfer hook called with amount: {}", amount);
         
-        let cpi_accounts = TransferChecked {
-            from: ctx.accounts.sender_wsol_token_account.to_account_info(),
-            mint: ctx.accounts.wsol_mint.to_account_info(),
-            to: ctx.accounts.wsol_vault.to_account_info(),
-            authority: ctx.accounts.config.to_account_info(),
-        };
+        // For now, just log and return success - no fee collection
+        // In a real implementation, you might want to:
+        // 1. Validate the transfer
+        // 2. Collect fees
+        // 3. Update state
         
-        let cpi_program = ctx.accounts.token_program.to_account_info();
-        let cpi_ctx = CpiContext::new(cpi_program, cpi_accounts).with_signer(signer_seeds);
-        
-        transfer_checked(cpi_ctx, amount, ctx.accounts.wsol_mint.decimals)?;
-        
+        msg!("Transfer hook completed successfully");
         Ok(())
     }
     pub fn fallback<'info>(
@@ -98,16 +89,12 @@ pub mod amm {
 }
 #[derive(Accounts)]
 pub struct TransferHook<'info> {
-    #[account(
-        token::mint = mint,
-        token::authority = owner,
-    )]
-    pub source_token: InterfaceAccount<'info, InterfaceTokenAccount>,
-    pub mint: InterfaceAccount<'info, InterfaceMint>,
-    #[account(
-        token::mint = mint,
-    )]
-    pub destination_token: InterfaceAccount<'info, InterfaceTokenAccount>,
+    /// CHECK: Source token account provided by Token-2022
+    pub source_token: UncheckedAccount<'info>,
+    /// CHECK: Mint provided by Token-2022
+    pub mint: UncheckedAccount<'info>,
+    /// CHECK: Destination token account provided by Token-2022
+    pub destination_token: UncheckedAccount<'info>,
     /// CHECK: source token account owner, can be SystemAccount or PDA owned by another program
     pub owner: UncheckedAccount<'info>,
     /// CHECK: ExtraAccountMetaList Account,
@@ -116,18 +103,20 @@ pub struct TransferHook<'info> {
         bump
     )]
     pub extra_account_meta_list: UncheckedAccount<'info>,
-    pub wsol_mint: InterfaceAccount<'info, InterfaceMint>,
+    /// CHECK: WSOL mint for Token-2022 (NATIVE_MINT_2022)
+    pub wsol_mint: AccountInfo<'info>,
     pub token_program: Interface<'info,TokenInterface>,
     pub associated_token_program: Program<'info, AssociatedToken>,
-    #[account(mut, associated_token::mint=wsol_mint, associated_token::authority=config)]
-    pub wsol_vault: InterfaceAccount<'info, InterfaceTokenAccount>,
-    #[account(seeds=[b"config",config.seed.to_le_bytes().as_ref()],bump)]
-    pub config:Account<'info,config>,
     #[account(
-        mut,
-        token::mint = wsol_mint,
-        token::authority = owner,
+        seeds=[b"config",config.seed.to_le_bytes().as_ref()],
+        bump
     )]
-    pub sender_wsol_token_account: InterfaceAccount<'info, InterfaceTokenAccount>,
+    pub config:Account<'info,config>,
+    /// CHECK: WSOL vault ATA for config authority
+    #[account(mut)]
+    pub wsol_vault: AccountInfo<'info>,
+    /// CHECK: Sender WSOL ATA
+    #[account(mut)]
+    pub sender_wsol_token_account: AccountInfo<'info>,
     pub system_program:Program<'info,System>
 }

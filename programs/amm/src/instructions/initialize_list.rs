@@ -12,29 +12,50 @@ use spl_tlv_account_resolution::{
     account::ExtraAccountMeta, seeds::Seed, state::ExtraAccountMetaList,
 };
 use spl_transfer_hook_interface::instruction::{ExecuteInstruction, TransferHookInstruction};
+use crate::config;
 impl <'info> InitializeExtraAccountMetaList<'info> {
     pub fn initialize(
         &mut self,bump:InitializeExtraAccountMetaListBumps,programid:Pubkey
     ) -> Result<()> {
-        let account_meta=vec![
-            ExtraAccountMeta::new_with_pubkey(&self.wsol_mint.key(), false,false)?,
-            ExtraAccountMeta::new_with_pubkey(&self.token_program.key(),false,false)?,
-            ExtraAccountMeta::new_with_pubkey(
-                &self.associated_token_program.key(),
-                false,
-                false,
-            )?,
-           // index 8, delegate PDA
-    ExtraAccountMeta::new_with_seeds(
-    &[Seed::Literal {
-        bytes: "delegate".as_bytes().to_vec(),
-    }],
-    false, // is_signer
-    false,  // is_writable
-    )?,
-     ExtraAccountMeta::new_external_pda_with_seeds(7,&[Seed::AccountKey { index: 8},Seed::AccountKey { index: 6 },Seed::AccountKey { index: 5 }],false, true)?,     
-    ExtraAccountMeta::new_external_pda_with_seeds(7, &[Seed::AccountKey { index: 3 },Seed::AccountKey { index: 6 },Seed::AccountKey { index: 5 }], false,true)?,
-        ];
+        // Base accounts: 0=source, 1=mint, 2=destination, 3=owner
+        // Extra accounts for config-based fee collection:
+        // 5: wsol_mint (Token-2022 WSOL)
+        // 6: token_program (Token-2022)
+        // 7: associated_token_program
+        // 8: config PDA
+        // 9: wsol_vault = ATA(config, wsol_mint, token_program)
+        // 10: sender_wsol_token_account = ATA(owner, wsol_mint, token_program)
+        // 11: system_program
+        let mut account_meta = Vec::<ExtraAccountMeta>::with_capacity(7);
+        account_meta.push(ExtraAccountMeta::new_with_pubkey(&self.wsol_mint.key(), false, false)?); // 5
+        account_meta.push(ExtraAccountMeta::new_with_pubkey(&self.token_program.key(), false, false)?); // 6
+        account_meta.push(ExtraAccountMeta::new_with_pubkey(&self.associated_token_program.key(), false, false)?); // 7
+        // 8: config PDA (place BEFORE its ATA so seeds can reference it)
+        account_meta.push(ExtraAccountMeta::new_with_pubkey(&self.config.key(), false, false)?);
+        // 9: wsol_vault = ATA(config, wsol_mint, token_program)
+        account_meta.push(ExtraAccountMeta::new_external_pda_with_seeds(
+            7,
+            &[
+                Seed::AccountKey { index: 8 }, // config authority
+                Seed::AccountKey { index: 6 }, // token_program (Token-2022)
+                Seed::AccountKey { index: 5 }, // wsol_mint (NATIVE_MINT_2022)
+            ],
+            false,
+            true,
+        )?);
+        // 10: sender_wsol_token_account = ATA(owner, wsol_mint, token_program)
+        account_meta.push(ExtraAccountMeta::new_external_pda_with_seeds(
+            7,
+            &[
+                Seed::AccountKey { index: 3 }, // owner authority
+                Seed::AccountKey { index: 6 }, // token_program (Token-2022)
+                Seed::AccountKey { index: 5 }, // wsol_mint (NATIVE_MINT_2022)
+            ],
+            false,
+            true,
+        )?);
+        // 11: system_program
+        account_meta.push(ExtraAccountMeta::new_with_pubkey(&self.system_program.key(), false, false)?);
         let acount_size=ExtraAccountMetaList::size_of(account_meta.len())? as u64;
         let lampott=Rent::get()?.minimum_balance(acount_size as usize);
         let mint=self.mint.key();   
@@ -55,8 +76,15 @@ pub struct InitializeExtraAccountMetaList<'info> {
     #[account(mut,seeds=[b"extra-account-metas",mint.key().as_ref()],bump)]
     pub extra_account_meta_list:AccountInfo<'info>,
     pub mint:InterfaceAccount<'info,Mint>,
-    pub wsol_mint:InterfaceAccount<'info,Mint>,
+    /// CHECK: WSOL mint for Token-2022 (NATIVE_MINT_2022)
+    pub wsol_mint: AccountInfo<'info>,
     pub token_program:Interface<'info,TokenInterface>,
     pub associated_token_program:Program<'info,AssociatedToken>,
+    #[account(
+        mut,
+        seeds = [b"config", config.seed.to_le_bytes().as_ref()],
+        bump = config.config_bump
+    )]
+    pub config: Account<'info, config>,
     pub system_program:Program<'info,System>
 }

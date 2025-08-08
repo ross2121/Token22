@@ -10,7 +10,8 @@ pub struct Swap<'info>{
 #[account(mut)]
 pub signer:Signer<'info>,
 pub token_mint: Account<'info, Mint>,  
-    pub wsol_mint: Account<'info, Mint>,
+    /// CHECK: WSOL mint for Token-2022 (NATIVE_MINT_2022)
+    pub wsol_mint: AccountInfo<'info>,
     #[account(mut)]
     pub user_token: Account<'info, TokenAccount>,  // User's Token-2022 accoun             // User's SOL account
     #[account(mut)]
@@ -30,8 +31,9 @@ pub config:Account<'info,config>,
 )]
     /// CHECK: This is the user's SOL account, checked in the instruction logic.
 pub extra_account_meta_list: UncheckedAccount<'info>,
-#[account(mut, associated_token::mint=wsol_mint, associated_token::authority=config)]
-pub wsol_vault: Account<'info, TokenAccount>,
+    /// CHECK: WSOL vault ATA for config authority
+    #[account(mut)]
+    pub wsol_vault: AccountInfo<'info>,
 pub system_program:Program<'info,System>,
 pub token_program:Program<'info,Token>,
 pub token_2022_program: Program<'info, Token2022>,
