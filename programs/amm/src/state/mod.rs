@@ -12,7 +12,8 @@ pub struct config{
     pub sol_vault_bump: u8, 
     pub lp_bump:u8,
     pub bridge_config: Option<Pubkey>, // Reference to bridge config if this pool uses bridge tokens
-    pub is_bridge_pool: bool, // Whether this pool trades bridge tokens
+    pub is_bridge_pool: bool, 
+    // Whether this pool trades bridge tokens
 }
 
 // Bridge-related state structures for AMM integration

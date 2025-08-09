@@ -62,15 +62,14 @@ impl <'info> InitializeExtraAccountMetaList<'info> {
         let mint_key = self.mint.key();
         let program_id_key = programid;
         let (expected_pda, pda_bump) = Pubkey::find_program_address(
-            &[b"extra-account-metas", mint_key.as_ref(), program_id_key.as_ref()],
+            &[b"extra-account-metas", mint_key.as_ref()],
             &program_id_key,
         );
         require_keys_eq!(expected_pda, self.extra_account_meta_list.key(), AmmError::InvalidAmount);
         let seed_extra: &[u8] = b"extra-account-metas";
         let seed_mint: &[u8] = mint_key.as_ref();
-        let seed_prog: &[u8] = program_id_key.as_ref();
         let seed_bump: &[u8] = &[pda_bump];
-        let signer_seeds: &[&[&[u8]]] = &[&[seed_extra, seed_mint, seed_prog, seed_bump]];
+        let signer_seeds: &[&[&[u8]]] = &[&[seed_extra, seed_mint, seed_bump]];
         create_account(
             CpiContext::new(
                 self.system_program.to_account_info(),

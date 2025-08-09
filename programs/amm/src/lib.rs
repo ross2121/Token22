@@ -34,7 +34,7 @@ pub mod amm {
         ctx: Context<Deposit>,
         sol_amount: u64, token_amount: u64, max_sol: u64, max_token: u64
     ) -> Result<()> {
-        ctx.accounts.deposit(sol_amount,token_amount,max_sol,max_token)
+        ctx.accounts.deposit(token_amount,max_sol,max_token)
     }
 
     pub fn swap(

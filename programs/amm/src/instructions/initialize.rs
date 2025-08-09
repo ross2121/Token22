@@ -24,9 +24,9 @@ pub lp_token:InterfaceAccount<'info, InterfaceMint>,
 pub vault:InterfaceAccount<'info, InterfaceTokenAccount>,
 #[account(mut, seeds=[b"sol_vault", config.key().as_ref()], bump)]
 pub sol_vault:SystemAccount<'info>,
-/// CHECK: WSOL vault ATA for config authority
-#[account(mut)]
-pub wsol_vault: AccountInfo<'info>,
+/// CHECK: WSOL vault ATA for config authority - will be created if needed
+#[account(init_if_needed, associated_token::mint=wsol_mint, associated_token::authority=config, payer=signer)]
+pub wsol_vault: InterfaceAccount<'info, InterfaceTokenAccount>,
 #[account(init,seeds=[b"config",seeds.to_le_bytes().as_ref()],bump,payer=signer,space=8+config::INIT_SPACE)]
 pub config:Account<'info,config>,
 pub system_program:Program<'info,System>,

@@ -7,12 +7,13 @@ skip-lint = false
 
 [programs.localnet]
 amm = "3D6uyMfYh3s315PgTRJQNsTNYfThWKoCfUaG1we6ZC8c"
+transfer_hook = "88CNX3Y7TyzjPtD76YhpmnPAsrmhSsYRVS5ad2wKMjuk"
 
 [registry]
 url = "https://api.apr.dev"
 
 [provider]
-cluster = "devnet"
+cluster = "localnet"
 wallet = "~/.config/solana/id.json"
 
 [scripts]
