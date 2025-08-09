@@ -39,5 +39,21 @@ pub enum AmmError {
     Insufficientbalance,
     #[msg("Zero balance")]
     ZeroBalance,
+    
+    // Bridge-related errors
+    #[msg("This is not a bridge pool")]
+    NotBridgePool,
+    #[msg("Pool is already configured as bridge pool")]
+    AlreadyBridgePool,
+    #[msg("Bridge config not set")]
+    BridgeConfigNotSet,
+    #[msg("Invalid bridge token mint")]
+    InvalidBridgeTokenMint,
+    #[msg("Insufficient bridge tokens")]
+    InsufficientBridgeTokens,
+    #[msg("Hook validation failed")]
+    HookValidationFailed,
+    #[msg("Unauthorized")]
+    Unauthorized,
 }
 

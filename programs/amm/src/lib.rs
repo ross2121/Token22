@@ -23,7 +23,7 @@ pub mod amm {
         fee: u16,
         authority: Option<Pubkey>
     ) -> Result<()> {
-        ctx.accounts.initialize(seed, fee, authority, &ctx.bumps, &ctx.remaining_accounts)
+        ctx.accounts.initialize(seed, fee, authority, &ctx.bumps)
     }
     pub fn initialize_extra_account_meta_list(
         ctx: Context<InitializeExtraAccountMetaList>,
@@ -54,6 +54,19 @@ pub mod amm {
         min_y: u64
     ) -> Result<()> {
         ctx.accounts.withdraw(amount, min_x, min_y)
+    }
+
+    // Bridge functionality for Token-2022 support
+    pub fn initialize_bridge_pool(ctx: Context<InitializeBridgePool>) -> Result<()> {
+        instructions::initialize_bridge_pool(ctx)
+    }
+
+    pub fn wrap_for_pool(ctx: Context<WrapForPool>, amount: u64) -> Result<()> {
+        instructions::wrap_for_pool(ctx, amount)
+    }
+
+    pub fn unwrap_from_pool(ctx: Context<UnwrapFromPool>, amount: u64) -> Result<()> {
+        instructions::unwrap_from_pool(ctx, amount)
     }
     pub fn transfer_hook(ctx: Context<TransferHook>, amount: u64) -> Result<()> {   
         msg!("Transfer hook called with amount: {}", amount);
@@ -97,14 +110,9 @@ pub struct TransferHook<'info> {
     pub destination_token: UncheckedAccount<'info>,
     /// CHECK: source token account owner, can be SystemAccount or PDA owned by another program
     pub owner: UncheckedAccount<'info>,
-    /// CHECK: ExtraAccountMetaList Account,
-    #[account(
-        seeds = [b"extra-account-metas", mint.key().as_ref()],
-        bump
-    )]
+    /// CHECK: ExtraAccountMetaList Account
     pub extra_account_meta_list: UncheckedAccount<'info>,
-    /// CHECK: WSOL mint for Token-2022 (NATIVE_MINT_2022)
-    pub wsol_mint: AccountInfo<'info>,
+    pub wsol_mint: InterfaceAccount<'info, InterfaceMint>,
     pub token_program: Interface<'info,TokenInterface>,
     pub associated_token_program: Program<'info, AssociatedToken>,
     #[account(
@@ -112,11 +120,18 @@ pub struct TransferHook<'info> {
         bump
     )]
     pub config:Account<'info,config>,
-    /// CHECK: WSOL vault ATA for config authority
-    #[account(mut)]
-    pub wsol_vault: AccountInfo<'info>,
-    /// CHECK: Sender WSOL ATA
-    #[account(mut)]
-    pub sender_wsol_token_account: AccountInfo<'info>,
+    #[account(
+        mut,
+        associated_token::mint = wsol_mint,
+        associated_token::authority = config,
+        associated_token::token_program = token_program
+    )]
+    pub wsol_vault: InterfaceAccount<'info, InterfaceTokenAccount>,
+    #[account(
+        mut,
+        token::mint = wsol_mint,
+        token::authority = owner,
+    )]
+    pub sender_wsol_token_account: InterfaceAccount<'info, InterfaceTokenAccount>,
     pub system_program:Program<'info,System>
 }

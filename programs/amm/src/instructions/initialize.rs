@@ -14,10 +14,10 @@ pub struct Initialize<'info>{
 #[account(mut)]
     pub signer:Signer<'info>,
       /// CHECK: ExtraAccountMetaList Account for storing transfer hook metadata
-      #[account(mut,seeds=[b"extra-account-metas",mint.key().as_ref()],bump)]
       pub extra_account_meta_list:AccountInfo<'info>,
  pub mint:InterfaceAccount<'info, InterfaceMint>,
- // wsol_mint accessed via remaining_accounts to bypass Anchor validation
+ /// CHECK: WSOL mint for Token-2022 (NATIVE_MINT_2022)
+ pub wsol_mint: AccountInfo<'info>,
 #[account(init,seeds=[b"lp",config.key().as_ref()],bump,mint::decimals=6,mint::authority=config,payer=signer)]
 pub lp_token:InterfaceAccount<'info, InterfaceMint>,
 #[account(init,associated_token::mint=mint,associated_token::authority=config,payer=signer)]
@@ -34,8 +34,20 @@ pub token_program:Interface<'info,TokenInterface>,
 pub associated_token_program:Program<'info,AssociatedToken>
 }
 impl<'info>  Initialize <'info>{
-    pub fn initialize(&mut self,seed:u64,fee:u16,authority:Option<Pubkey>,bump:&InitializeBumps, wsol_mint_key: Pubkey)->Result<()>{
-        self.config.set_inner(config { seed, authority, mint:self.mint.key(), fee, locked:false, config_bump:bump.config, lp_bump:bump.lp_token,wsol_mint:wsol_mint_key,sol_vault_bump:bump.sol_vault});
+    pub fn initialize(&mut self,seed:u64,fee:u16,authority:Option<Pubkey>,bump:&InitializeBumps)->Result<()>{
+        self.config.set_inner(config { 
+            seed, 
+            authority, 
+            mint:self.mint.key(), 
+            fee, 
+            locked:false, 
+            config_bump:bump.config, 
+            lp_bump:bump.lp_token,
+            wsol_mint:self.wsol_mint.key(),
+            sol_vault_bump:bump.sol_vault,
+            bridge_config: None,  // No bridge initially
+            is_bridge_pool: false, // Standard pool by default
+        });
         Ok(())
     }
    

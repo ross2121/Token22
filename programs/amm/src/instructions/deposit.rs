@@ -1,7 +1,8 @@
-    use anchor_lang::{prelude::*, system_program::{}};
+    use anchor_lang::prelude::*;
     use anchor_spl::{
-        associated_token::AssociatedToken, token_2022::{mint_to,TransferChecked,transfer_checked}, token_interface::{Transfer, Mint,MintTo, TokenAccount as InterfaceTokenAccount, TokenInterface}
+        associated_token::AssociatedToken, token_2022::{mint_to, MintTo}, token_interface::{Mint, TokenAccount as InterfaceTokenAccount, TokenInterface}
     };
+    use spl_token_2022::onchain::invoke_transfer_checked;
     // use constant_product_curve::constant_product_curve::ConstantProductCurve;
     use crate::{config, error::AmmError};
 
@@ -24,9 +25,8 @@
             associated_token::authority = signer,
         )]
         pub user_lp: Box<InterfaceAccount<'info, InterfaceTokenAccount>>,
-        #[account(seeds=[b"extra-account-metas", mint.key().as_ref()], bump)]
-        /// CHECK: This is the user's SOL account, checked in the instruction logic.
-         pub extra_account_meta_list: AccountInfo<'info>,
+        /// CHECK: ExtraAccountMetaList passed through; validated by transfer hook execution
+        pub extra_account_meta_list: AccountInfo<'info>,
         #[account(
             mut,
             seeds = [b"lp", config.key().as_ref()],
@@ -56,7 +56,24 @@
         pub system_program: Program<'info, System>,
         pub token_program: Interface<'info, TokenInterface>,
         pub associated_token_program: Program<'info, AssociatedToken>,
-        // no extra accounts
+        /// CHECK: WSOL mint for Token-2022 (NATIVE_MINT_2022)
+        pub wsol_mint: AccountInfo<'info>,
+        #[account(
+            mut,
+            associated_token::mint = wsol_mint,
+            associated_token::authority = config,
+            associated_token::token_program = token_program
+        )]
+        pub wsol_vault: InterfaceAccount<'info, InterfaceTokenAccount>,
+        #[account(
+            mut,
+            associated_token::mint = wsol_mint,
+            associated_token::authority = signer,
+            associated_token::token_program = token_program
+        )]
+        pub sender_wsol_token_account: InterfaceAccount<'info, InterfaceTokenAccount>,
+        /// CHECK: Transfer hook program id account, appended at the end of remaining accounts
+        pub transfer_hook_program: AccountInfo<'info>
     }
 
     impl<'info> Deposit<'info> {
@@ -124,21 +141,46 @@
                 msg!("mint: {}", self.mint.key());
                 msg!("token_vault: {}", self.token_vault.key());
                 msg!("user_token: {}", self.user_token.key());
-                
-                let cpi_ctx = CpiContext::new(
-                    self.token_program.to_account_info(),
-                    TransferChecked{
-                      from: self.user_token.to_account_info(),
-                      to: self.token_vault.to_account_info(),
-                      authority: self.signer.to_account_info(),
-                      mint: self.mint.to_account_info(),
-                    }
-                  )
-                  .with_remaining_accounts(vec![
-                    // Only the ExtraAccountMetaList is passed to Token-2022. It resolves the rest.
+                // Setup remaining accounts for invoke_transfer_checked
+                // Include extra_account_meta_list first, then the extras in the exact order
+                let remaining_accounts = vec![
+                    // validation account (Execute index 4)
                     self.extra_account_meta_list.to_account_info(),
-                  ]);
-                  transfer_checked(cpi_ctx, deposit_token,self.mint.decimals)?;
+                    // Matches indices 5..11 configured in initialize_list.rs
+                    self.wsol_mint.to_account_info(),
+                    self.token_program.to_account_info(),
+                    self.associated_token_program.to_account_info(),
+                    self.config.to_account_info(),
+                    self.wsol_vault.to_account_info(),
+                    self.sender_wsol_token_account.to_account_info(),
+                    self.system_program.to_account_info(),
+                    // Last: transfer hook program id (as per your pattern)
+                    self.transfer_hook_program.to_account_info(),
+                ];
+                invoke_transfer_checked(
+                    &self.token_program.key(),
+                    self.user_token.to_account_info(),
+                    self.mint.to_account_info(),
+                    self.token_vault.to_account_info(),
+                    self.signer.to_account_info(),
+                    &remaining_accounts,
+                    deposit_token,
+                    self.mint.decimals,
+                    &[],
+                )?;
+                // let cpi_ctx = CpiContext::new(
+                //     self.token_program.to_account_info(),
+                //     TransferChecked{
+                //       from: self.user_token.to_account_info(),
+                //       to: self.token_vault.to_account_info(),
+                //       authority: self.signer.to_account_info(),
+                //     }
+                //   )
+                //   .with_remaining_accounts(vec![
+                //     // Only the ExtraAccountMetaList is passed to Token-2022. It resolves the rest.
+                //     self.extra_account_meta_list.to_account_info(),
+                //   ]);
+                //   transfer_checked(cpi_ctx, deposit_token,self.mint.decimals)?;
             }
             
             // --- Mint LP Tokens ---

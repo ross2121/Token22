@@ -62,7 +62,7 @@ describe("amm", () => {
       )
       
      const [extramint] = PublicKey.findProgramAddressSync(
-      [Buffer.from("extra-account-metas"), mint.publicKey.toBuffer()],
+      [Buffer.from("extra-account-metas"), mint.publicKey.toBuffer(), program.programId.toBuffer()],
       program.programId
     );
     const fee = 2;
@@ -123,7 +123,7 @@ describe("amm", () => {
       signer: wallet.publicKey,
       extraAccountMetaList: extramint,
       mint: mint.publicKey,
-      // wsolMint removed from struct, passed via remainingAccounts
+      wsolMint: NATIVE_MINT_2022,
       lpToken: lptoken,
       vault,
       solVault: solvault,
@@ -133,13 +133,6 @@ describe("amm", () => {
       tokenProgram: TOKEN_2022_PROGRAM_ID,
       associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID
     })
-    .remainingAccounts([
-      { 
-        pubkey: NATIVE_MINT_2022, 
-        isWritable: false, 
-        isSigner: false 
-      }
-    ])
     .signers([wallet]).rpc();
     console.log("fsadsd",tx);
     const transaction2 = new Transaction().add(
@@ -181,22 +174,22 @@ describe("amm", () => {
      console.log("tempata",destinationTokenAccount.toString());
      console.log("dadsa",vault.toString());
      console.log("dasd",config.toString());
-
+ 
     
     
     console.log("transaction3",tx);
     // Temporarily skip transfer hook initialization to focus on core AMM
-    // const extraAccountMetaL=await program.methods.initializeExtraAccountMetaList().accountsStrict({
-    //   payer:wallet.publicKey,
-    //   extraAccountMetaList:extramint,
-    //    mint:mint.publicKey,
-    //    wsolMint:NATIVE_MINT_2022,
-    //    systemProgram:SYSTEM_PROGRAM_ID,
-    //    tokenProgram:TOKEN_2022_PROGRAM_ID,
-    //    config:config,
-    //    associatedTokenProgram:ASSOCIATED_TOKEN_PROGRAM_ID
-    // }).signers([wallet]).rpc();
-    // console.log("tx4",extraAccountMetaL);  
+    const extraAccountMetaL=await program.methods.initializeExtraAccountMetaList().accountsStrict({
+      payer:wallet.publicKey,
+      extraAccountMetaList:extramint,
+       mint:mint.publicKey,
+       wsolMint:NATIVE_MINT_2022,
+       systemProgram:SYSTEM_PROGRAM_ID,
+       tokenProgram:TOKEN_2022_PROGRAM_ID,
+       config:config,
+       associatedTokenProgram:ASSOCIATED_TOKEN_PROGRAM_ID
+    }).signers([wallet]).rpc();
+    console.log("tx4",extraAccountMetaL);  
 
     // Ensure sender's WSOL-2022 ATA exists
     try {
@@ -251,9 +244,10 @@ describe("amm", () => {
       tokenProgram: TOKEN_2022_PROGRAM_ID,
       associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID,
       extraAccountMetaList:extramint,
-      // wsolMint:NATIVE_MINT_2022,
-      // wsolVault:wsolVault,
-      // senderWsolTokenAccount:senderwsol
+      wsolMint:NATIVE_MINT_2022,
+      wsolVault:wsolVault,
+      senderWsolTokenAccount:senderwsol,
+      transferHookProgram: program.programId
     }).signers([wallet]).rpc();
     
     console.log("Deposit tx:", tx3);

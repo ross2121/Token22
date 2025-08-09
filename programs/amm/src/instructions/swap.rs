@@ -11,7 +11,7 @@ pub struct Swap<'info>{
 pub signer:Signer<'info>,
 pub token_mint: Account<'info, Mint>,  
     /// CHECK: WSOL mint for Token-2022 (NATIVE_MINT_2022)
-    pub wsol_mint: AccountInfo<'info>,
+    // wsol_mint accessed via remaining_accounts to bypass Anchor validation
     #[account(mut)]
     pub user_token: Account<'info, TokenAccount>,  // User's Token-2022 accoun             // User's SOL account
     #[account(mut)]
@@ -25,11 +25,7 @@ pub token_vault: Account<'info, TokenAccount>,
 pub sol_vault: AccountInfo<'info>,
 #[account(mut,seeds=[b"config",config.seed.to_le_bytes().as_ref()],bump=config.config_bump)]
 pub config:Account<'info,config>,
-#[account(
-    seeds = [b"extra-account-metas", token_mint.key().as_ref()],
-    bump
-)]
-    /// CHECK: This is the user's SOL account, checked in the instruction logic.
+    /// CHECK: ExtraAccountMetaList passed through; validated at runtime by transfer hook
 pub extra_account_meta_list: UncheckedAccount<'info>,
     /// CHECK: WSOL vault ATA for config authority
     #[account(mut)]
