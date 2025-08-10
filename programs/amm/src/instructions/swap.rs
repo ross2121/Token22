@@ -146,42 +146,6 @@ impl<'info>  Swap <'info>{
         
         transfer(cpi_context, amount)
     }
-//     pub fn transfer_hook(ctx: Context<Swap>, amount: u64) -> Result<()> {   
-//         let signer_Seed:& [ & [ & [ u8 ]]] =&[&[b"delegate",&[ctx.bumps.delegate]]];
-        
-//         let cpi_accounts = TransferChecked {
-//             from: ctx.accounts.user_wsol.to_account_info(),
-//             mint: ctx.accounts.wsol_mint.to_account_info(),
-//             to: ctx.accounts.delegate_wsol.to_account_info(),
-//             authority: ctx.accounts.delegate.to_account_info(),
-//         };
-//         let cpi_program = ctx.accounts.token_program.to_account_info();
-//         let cpi_ctx = CpiContext::new(cpi_program, cpi_accounts).with_signer(signer_Seed);
-
-//         transfer_checked(cpi_ctx, amount, ctx.accounts.wsol_mint.decimals)?;
-        
-//         Ok(())
-//     }
-
-// // fallback instruction handler as workaround to anchor instruction discriminator check
-// pub fn fallback(
-//     program_id: &Pubkey,
-//     accounts: &'info [AccountInfo<'info>],
-//     data: &[u8],
-// ) -> Result<()> {
-//     let instruction = Swap::unpack(data)?;
-
-//     // match instruction discriminator to transfer hook interface execute instruction
-//     // token2022 program CPIs this instruction on token transfer
-//     match instruction {
-//         TransferHookInstruction::Execute { amount } => {
-//             let amount_bytes = amount.to_le_bytes();
-
-//             // invoke custom transfer hook instruction on our program
-//             __private::__global::transfer_hook(program_id, accounts, &amount_bytes)
-//         }
-//         _ => return Err(ProgramError::InvalidInstructionData.into()),
-//     }
-// }
+    
 
 }

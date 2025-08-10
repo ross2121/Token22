@@ -9,7 +9,6 @@ import { BN, min } from "bn.js";
 import { bs58 } from "@coral-xyz/anchor/dist/cjs/utils/bytes";
 
 describe("amm", () => {
-//8bqYTWshpCYLBNRojKQyCVa8hvtGmwMiA4LFtK4mye8c
   anchor.setProvider(anchor.AnchorProvider.env());
 
   const program = anchor.workspace.amm as Program<Amm>;
@@ -17,27 +16,6 @@ describe("amm", () => {
 
     const decimals = 9;
   beforeEach(async () => {
-
-
-
-    
-     
-    // // const [delegatePDA] = PublicKey.findProgramAddressSync(
-    // //   [Buffer.from("delegate")],
-    // //   program.programId
-    // // );
-    // console.log("dasdasdas")
-    // [solvault] = PublicKey.findProgramAddressSync(
-    //   [Buffer.from("sol_vault"), config.toBuffer()], program.programId
-    // )
-    //   console.log("rterdas")    
-    // // userx = getAssociatedTokenAddressSync(minta, wallet.payer.publicKey, false);
-    // // usery = getAssociatedTokenAddressSync(mintb, wallet.payer.publicKey, false);
-    // // userlp = getAssociatedTokenAddressSync(lptoken, wallet.payer.publicKey, false);
-    
-    // vault = getAssociatedTokenAddressSync(mint, config, true, TOKEN_PROGRAM_ID);
-    // wsol=getAssociatedTokenAddressSync(NATIVE_MINT,config,true,TOKEN_2022_PROGRAM_ID)
-    // vaultb = getAssociatedTokenAddressSync(mintb, config, true, TOKEN_PROGRAM_ID);
   });
 
   it("Initialize pool", async () => {
@@ -55,7 +33,7 @@ describe("amm", () => {
      const mint=Keypair.generate();
      const mintB=Keypair.generate(); // Second Token-2022 mint instead of WSOL
      const vault = getAssociatedTokenAddressSync(mint.publicKey, config,true, TOKEN_2022_PROGRAM_ID,ASSOCIATED_TOKEN_PROGRAM_ID);
-    //  const wsol=getAssociatedTokenAddressSync(NATIVE_MINT_2022,config,true,TOKEN_2022_PROGRAM_ID)
+    
       const sourceTokenAccount =getAssociatedTokenAddressSync(
       mint.publicKey,
       wallet.publicKey,
@@ -92,7 +70,6 @@ describe("amm", () => {
        ASSOCIATED_TOKEN_PROGRAM_ID
      );
     
-    // Calculate the expected vault address manually to verify
     const expectedVault = getAssociatedTokenAddressSync(mint.publicKey, config, true, TOKEN_2022_PROGRAM_ID);
 
     const temp=Keypair.generate();
@@ -103,7 +80,6 @@ describe("amm", () => {
       TOKEN_2022_PROGRAM_ID,
       ASSOCIATED_TOKEN_PROGRAM_ID
     );
-    // Calculate the expected user_token address manually to verify
     const expectedUserToken = getAssociatedTokenAddressSync(mint.publicKey, wallet.publicKey, false, TOKEN_2022_PROGRAM_ID);
 
     
@@ -206,7 +182,6 @@ describe("amm", () => {
         TOKEN_2022_PROGRAM_ID,
         ASSOCIATED_TOKEN_PROGRAM_ID
     ),
-      // Create delegate's WSOL ATA (owner = delegate PDA)
       createAssociatedTokenAccountInstruction(
         wallet.publicKey,
         delegateWsolAta,
@@ -231,7 +206,6 @@ describe("amm", () => {
         [],
         TOKEN_2022_PROGRAM_ID
       ),
-      // Approve delegate to spend WSOL for transfer hook fees
       createApproveInstruction(
         senderwsol,
         delegatePda,
@@ -258,7 +232,6 @@ describe("amm", () => {
     
     
     console.log("transaction3",tx);
-    // Initialize ExtraAccountMetaList for the transfer hook program
     const extraAccountMetaL = await transferHookProgram.methods.initializeExtraAccountMetaList().accounts({
       payer: wallet.publicKey,
       extraAccountMetaList: extramint,
@@ -280,7 +253,6 @@ describe("amm", () => {
     console.log("- senderwsol:", senderwsol.toString());
     console.log("- extramint (ExtraAccountMetaList):", extramint.toString());
 
-    // Token accounts will be created automatically via init_if_needed
     const solAmount = new anchor.BN(2 * 10**9); // 2 SOL
     const tokenAmount = new anchor.BN(10); // skip token transfer to avoid transfer-hook extra accounts
     const solnmax=new anchor.BN(1000);
