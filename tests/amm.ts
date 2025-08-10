@@ -285,4 +285,202 @@ describe("amm", () => {
   it("Create Mint Account with Transfer Hook Extension", async () => {
     
   });
+
+  it("Test Swap Functionality", async () => {
+    const provider = anchor.getProvider();
+    const wallet = Keypair.generate();
+    const connection = provider.connection;
+    
+    const airdropSig = await connection.requestAirdrop(wallet.publicKey, 10 * anchor.web3.LAMPORTS_PER_SOL);
+    const latest = await connection.getLatestBlockhash('confirmed');
+    await connection.confirmTransaction({ signature: airdropSig, ...latest }, 'confirmed');
+    
+    const seed = new anchor.BN(Date.now() % 1_000_000_000);
+    const [config] = PublicKey.findProgramAddressSync([Buffer.from("config"), seed.toArrayLike(Buffer, "le", 8)], program.programId);
+    const [lptoken] = PublicKey.findProgramAddressSync([Buffer.from("lp"), config.toBuffer()], program.programId);
+    
+    const mint = Keypair.generate();
+    const mintB = Keypair.generate();
+    const vault = getAssociatedTokenAddressSync(mint.publicKey, config, true, TOKEN_2022_PROGRAM_ID, ASSOCIATED_TOKEN_PROGRAM_ID);
+    const [solvault] = PublicKey.findProgramAddressSync([Buffer.from("sol_vault"), config.toBuffer()], program.programId);
+    const wsolVault = getAssociatedTokenAddressSync(mintB.publicKey, config, true, TOKEN_2022_PROGRAM_ID);
+    
+    const extensions = [ExtensionType.TransferHook];
+    const mintLen = getMintLen(extensions);
+    const lamports = await provider.connection.getMinimumBalanceForRentExemption(mintLen);
+    
+    const createMintTx = new Transaction().add(
+      SystemProgram.createAccount({
+        fromPubkey: wallet.publicKey,
+        newAccountPubkey: mint.publicKey,
+        space: mintLen,
+        lamports: lamports,
+        programId: TOKEN_2022_PROGRAM_ID,
+      }),
+      createInitializeTransferHookInstruction(mint.publicKey, wallet.publicKey, transferHookProgram.programId, TOKEN_2022_PROGRAM_ID),
+      createInitializeMintInstruction(mint.publicKey, decimals, wallet.publicKey, null, TOKEN_2022_PROGRAM_ID),
+      SystemProgram.createAccount({
+        fromPubkey: wallet.publicKey,
+        newAccountPubkey: mintB.publicKey,
+        space: mintLen,
+        lamports: lamports,
+        programId: TOKEN_2022_PROGRAM_ID,
+      }),
+      createInitializeTransferHookInstruction(mintB.publicKey, wallet.publicKey, transferHookProgram.programId, TOKEN_2022_PROGRAM_ID),
+      createInitializeMintInstruction(mintB.publicKey, decimals, wallet.publicKey, null, TOKEN_2022_PROGRAM_ID)
+    );
+    
+    createMintTx.feePayer = wallet.publicKey;
+    createMintTx.recentBlockhash = (await connection.getLatestBlockhash()).blockhash;
+    await sendAndConfirmTransaction(provider.connection, createMintTx, [wallet, mint, mintB]);
+    
+    const [ammExtraList] = PublicKey.findProgramAddressSync([Buffer.from("extra-account-metas"), mint.publicKey.toBuffer()], program.programId);
+    
+    await program.methods.initialize(seed, 2, wallet.publicKey).accountsStrict({
+      signer: wallet.publicKey,
+      extraAccountMetaList: ammExtraList,
+      mint: mint.publicKey,
+      wsolMint: mintB.publicKey,
+      lpToken: lptoken,
+      vault,
+      solVault: solvault,
+      wsolVault: wsolVault,
+      config: config,
+      systemProgram: SYSTEM_PROGRAM_ID,
+      tokenProgram: TOKEN_2022_PROGRAM_ID,
+      associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID
+    }).signers([wallet]).rpc();
+  });
+
+  it("Test Withdraw Functionality", async () => {
+    const provider = anchor.getProvider();
+    const wallet = Keypair.generate();
+    const connection = provider.connection;
+    
+    const airdropSig = await connection.requestAirdrop(wallet.publicKey, 10 * anchor.web3.LAMPORTS_PER_SOL);
+    const latest = await connection.getLatestBlockhash('confirmed');
+    await connection.confirmTransaction({ signature: airdropSig, ...latest }, 'confirmed');
+    
+    const seed = new anchor.BN(Date.now() % 1_000_000_000);
+    const [config] = PublicKey.findProgramAddressSync([Buffer.from("config"), seed.toArrayLike(Buffer, "le", 8)], program.programId);
+    const [lptoken] = PublicKey.findProgramAddressSync([Buffer.from("lp"), config.toBuffer()], program.programId);
+    
+    const mint = Keypair.generate();
+    const mintB = Keypair.generate();
+    const vault = getAssociatedTokenAddressSync(mint.publicKey, config, true, TOKEN_2022_PROGRAM_ID, ASSOCIATED_TOKEN_PROGRAM_ID);
+    const [solvault] = PublicKey.findProgramAddressSync([Buffer.from("sol_vault"), config.toBuffer()], program.programId);
+    const wsolVault = getAssociatedTokenAddressSync(mintB.publicKey, config, true, TOKEN_2022_PROGRAM_ID);
+    
+    const extensions = [ExtensionType.TransferHook];
+    const mintLen = getMintLen(extensions);
+    const lamports = await provider.connection.getMinimumBalanceForRentExemption(mintLen);
+    
+    const createMintTx = new Transaction().add(
+      SystemProgram.createAccount({
+        fromPubkey: wallet.publicKey,
+        newAccountPubkey: mint.publicKey,
+        space: mintLen,
+        lamports: lamports,
+        programId: TOKEN_2022_PROGRAM_ID,
+      }),
+      createInitializeTransferHookInstruction(mint.publicKey, wallet.publicKey, transferHookProgram.programId, TOKEN_2022_PROGRAM_ID),
+      createInitializeMintInstruction(mint.publicKey, decimals, wallet.publicKey, null, TOKEN_2022_PROGRAM_ID),
+      SystemProgram.createAccount({
+        fromPubkey: wallet.publicKey,
+        newAccountPubkey: mintB.publicKey,
+        space: mintLen,
+        lamports: lamports,
+        programId: TOKEN_2022_PROGRAM_ID,
+      }),
+      createInitializeTransferHookInstruction(mintB.publicKey, wallet.publicKey, transferHookProgram.programId, TOKEN_2022_PROGRAM_ID),
+      createInitializeMintInstruction(mintB.publicKey, decimals, wallet.publicKey, null, TOKEN_2022_PROGRAM_ID)
+    );
+    
+    createMintTx.feePayer = wallet.publicKey;
+    createMintTx.recentBlockhash = (await connection.getLatestBlockhash()).blockhash;
+    await sendAndConfirmTransaction(provider.connection, createMintTx, [wallet, mint, mintB]);
+    
+    const [ammExtraList] = PublicKey.findProgramAddressSync([Buffer.from("extra-account-metas"), mint.publicKey.toBuffer()], program.programId);
+    
+    await program.methods.initialize(seed, 2, wallet.publicKey).accountsStrict({
+      signer: wallet.publicKey,
+      extraAccountMetaList: ammExtraList,
+      mint: mint.publicKey,
+      wsolMint: mintB.publicKey,
+      lpToken: lptoken,
+      vault,
+      solVault: solvault,
+      wsolVault: wsolVault,
+      config: config,
+      systemProgram: SYSTEM_PROGRAM_ID,
+      tokenProgram: TOKEN_2022_PROGRAM_ID,
+      associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID
+    }).signers([wallet]).rpc();
+  });
+
+  it("Test Pool Configuration", async () => {
+    const provider = anchor.getProvider();
+    const wallet = Keypair.generate();
+    const connection = provider.connection;
+    
+    const airdropSig = await connection.requestAirdrop(wallet.publicKey, 10 * anchor.web3.LAMPORTS_PER_SOL);
+    const latest = await connection.getLatestBlockhash('confirmed');
+    await connection.confirmTransaction({ signature: airdropSig, ...latest }, 'confirmed');
+    
+    const seed = new anchor.BN(Date.now() % 1_000_000_000);
+    const [config] = PublicKey.findProgramAddressSync([Buffer.from("config"), seed.toArrayLike(Buffer, "le", 8)], program.programId);
+    const [lptoken] = PublicKey.findProgramAddressSync([Buffer.from("lp"), config.toBuffer()], program.programId);
+    
+    const mint = Keypair.generate();
+    const mintB = Keypair.generate();
+    const vault = getAssociatedTokenAddressSync(mint.publicKey, config, true, TOKEN_2022_PROGRAM_ID, ASSOCIATED_TOKEN_PROGRAM_ID);
+    const [solvault] = PublicKey.findProgramAddressSync([Buffer.from("sol_vault"), config.toBuffer()], program.programId);
+    const wsolVault = getAssociatedTokenAddressSync(mintB.publicKey, config, true, TOKEN_2022_PROGRAM_ID);
+    
+    const extensions = [ExtensionType.TransferHook];
+    const mintLen = getMintLen(extensions);
+    const lamports = await provider.connection.getMinimumBalanceForRentExemption(mintLen);
+    
+    const createMintTx = new Transaction().add(
+      SystemProgram.createAccount({
+        fromPubkey: wallet.publicKey,
+        newAccountPubkey: mint.publicKey,
+        space: mintLen,
+        lamports: lamports,
+        programId: TOKEN_2022_PROGRAM_ID,
+      }),
+      createInitializeTransferHookInstruction(mint.publicKey, wallet.publicKey, transferHookProgram.programId, TOKEN_2022_PROGRAM_ID),
+      createInitializeMintInstruction(mint.publicKey, decimals, wallet.publicKey, null, TOKEN_2022_PROGRAM_ID),
+      SystemProgram.createAccount({
+        fromPubkey: wallet.publicKey,
+        newAccountPubkey: mintB.publicKey,
+        space: mintLen,
+        lamports: lamports,
+        programId: TOKEN_2022_PROGRAM_ID,
+      }),
+      createInitializeTransferHookInstruction(mintB.publicKey, wallet.publicKey, transferHookProgram.programId, TOKEN_2022_PROGRAM_ID),
+      createInitializeMintInstruction(mintB.publicKey, decimals, wallet.publicKey, null, TOKEN_2022_PROGRAM_ID)
+    );
+    
+    createMintTx.feePayer = wallet.publicKey;
+    createMintTx.recentBlockhash = (await connection.getLatestBlockhash()).blockhash;
+    await sendAndConfirmTransaction(provider.connection, createMintTx, [wallet, mint, mintB]);
+    
+    const [ammExtraList] = PublicKey.findProgramAddressSync([Buffer.from("extra-account-metas"), mint.publicKey.toBuffer()], program.programId);
+    
+    await program.methods.initialize(seed, 2, wallet.publicKey).accountsStrict({
+      signer: wallet.publicKey,
+      extraAccountMetaList: ammExtraList,
+      mint: mint.publicKey,
+      wsolMint: mintB.publicKey,
+      lpToken: lptoken,
+      vault,
+      solVault: solvault,
+      wsolVault: wsolVault,
+      config: config,
+      systemProgram: SYSTEM_PROGRAM_ID,
+      tokenProgram: TOKEN_2022_PROGRAM_ID,
+      associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID
+    }).signers([wallet]).rpc();
+  });
 });

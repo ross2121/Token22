@@ -339,12 +339,9 @@ describe("Comprehensive AMM + Transfer Hook Test", () => {
   });
 
   it("6. Perform Token-to-SOL Swap", async () => {
-    console.log("\n🔄 Performing token-to-SOL swap...");
+    const swapAmount = new BN(10 * 10 ** decimals);
+    const minOut = new BN(0.1 * LAMPORTS_PER_SOL);
 
-    const swapAmount = new BN(10 * 10 ** decimals); // Swap 10 tokens
-    const minOut = new BN(0.1 * LAMPORTS_PER_SOL); // Expect at least 0.1 SOL
-
-    // Get initial balances
     const initialTokenBalance = await getAccount(
       connection,
       userTokenAccount,
@@ -353,12 +350,8 @@ describe("Comprehensive AMM + Transfer Hook Test", () => {
     );
     const initialSolBalance = await connection.getBalance(user.publicKey);
 
-    console.log(`Pre-swap token balance: ${initialTokenBalance.amount}`);
-    console.log(`Pre-swap SOL balance: ${initialSolBalance / LAMPORTS_PER_SOL} SOL`);
-
-    // Perform swap (token to SOL)
     await program.methods
-      .swap(swapAmount, true, minOut) // true = swapping token (X) for SOL (Y)
+      .swap(swapAmount, true, minOut)
       .accountsStrict({
         signer: user.publicKey,
         mintx: tokenMint.publicKey,
@@ -384,9 +377,8 @@ describe("Comprehensive AMM + Transfer Hook Test", () => {
       .signers([user])
       .rpc();
 
-    console.log(`✅ Token-to-SOL swap completed`);
 
-    // Verify balance changes
+
     const finalTokenBalance = await getAccount(
       connection,
       userTokenAccount,
@@ -395,13 +387,8 @@ describe("Comprehensive AMM + Transfer Hook Test", () => {
     );
     const finalSolBalance = await connection.getBalance(user.publicKey);
 
-    console.log(`Post-swap token balance: ${finalTokenBalance.amount}`);
-    console.log(`Post-swap SOL balance: ${finalSolBalance / LAMPORTS_PER_SOL} SOL`);
-
-    // Verify tokens were deducted
     expect(Number(finalTokenBalance.amount)).to.be.lessThan(Number(initialTokenBalance.amount));
     
-    // Verify transfer hook fee was collected
     const delegateFeeBalance = await getAccount(
       connection,
       delegateWsolAta,
@@ -409,16 +396,12 @@ describe("Comprehensive AMM + Transfer Hook Test", () => {
       TOKEN_2022_PROGRAM_ID
     );
     expect(Number(delegateFeeBalance.amount)).to.be.greaterThan(0);
-    console.log(`Transfer hook fees collected: ${delegateFeeBalance.amount}`);
   });
 
   it("7. Perform SOL-to-Token Swap", async () => {
-    console.log("\n🔄 Performing SOL-to-token swap...");
+    const swapAmount = new BN(1 * LAMPORTS_PER_SOL); 
+    const minOut = new BN(1 * 10 ** decimals); 
 
-    const swapAmount = new BN(1 * LAMPORTS_PER_SOL); // Swap 1 SOL
-    const minOut = new BN(1 * 10 ** decimals); // Expect at least 1 token
-
-    // Get initial balances
     const initialTokenBalance = await getAccount(
       connection,
       userTokenAccount,
@@ -427,12 +410,8 @@ describe("Comprehensive AMM + Transfer Hook Test", () => {
     );
     const initialSolBalance = await connection.getBalance(user.publicKey);
 
-    console.log(`Pre-swap token balance: ${initialTokenBalance.amount}`);
-    console.log(`Pre-swap SOL balance: ${initialSolBalance / LAMPORTS_PER_SOL} SOL`);
-
-    // Perform swap (SOL to token)
     await program.methods
-      .swap(swapAmount, false, minOut) // false = swapping SOL (Y) for token (X)
+      .swap(swapAmount, false, minOut)
       .accountsStrict({
         signer: user.publicKey,
         mintx: tokenMint.publicKey,

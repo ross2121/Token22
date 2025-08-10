@@ -17,4 +17,6 @@ pub mod bridge_unwrap;
 pub use bridge_unwrap::*;
 pub mod initialize_bridge_pool;
 pub use initialize_bridge_pool::*;
+pub mod swaptoken;
+pub use swaptoken::*;
 
