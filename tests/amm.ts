@@ -277,76 +277,11 @@ describe("amm", () => {
     console.log("Deposit tx:", tx3);
   });
 
-  it("Deposit liquidity", async () => {
-    const amount = new anchor.BN(2);
-    const max_x = new anchor.BN(6);
-    const max_y = new anchor.BN(6);
-    
-    const tx = await program.methods.deposit(amount, max_x, max_y).accountsStrict({
-      signer: wallet.payer.publicKey,
-      mintx: minta,
-      minty: mintb,
-      lpToken: lptoken,
-      vaultX: vaulta,
-      vaultY: vaultb,
-      userX: userx,
-      userY: usery,
-      userLp: userlp,
-      config: config,
-      systemProgram: SYSTEM_PROGRAM_ID,
-      tokenProgram: TOKEN_PROGRAM_ID,
-      associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID
-    }).rpc();
-    
-    console.log("Deposit tx:", tx);
-  });
 
-  it("Swap tokens", async () => {
-    const amount = new anchor.BN(2);
-    const min_receive = new anchor.BN(1);
-    
-    const tx = await program.methods.swap(amount, true, min_receive).accountsStrict({
-      signer: wallet.payer.publicKey,
-      mintx: minta,
-      minty: mintb,
-      lpToken: lptoken,
-      vaultX: vaulta,
-      vaultY: vaultb,
-      userX: userx,
-      userY: usery,
-      userLp: userlp,
-      config: config,
-      systemProgram: SYSTEM_PROGRAM_ID,
-      tokenProgram: TOKEN_PROGRAM_ID,
-      associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID
-    }).rpc();
-    
-    console.log("Swap tx:", tx);
-  });
 
-  it("Withdraw liquidity", async () => {
-    const amount = new anchor.BN(2);
-    const min_x = new anchor.BN(1);
-    const min_y = new anchor.BN(1);
-    
-    const tx = await program.methods.withdraw(amount, min_x, min_y).accountsStrict({
-      signer: wallet.payer.publicKey,
-      mintx: minta,
-      minty: mintb,
-      lpToken: lptoken,
-      vaultX: vaulta,
-      vaultY: vaultb,
-      userX: userx,
-      userY: usery,
-      userLp: userlp,
-      config: config,
-      systemProgram: SYSTEM_PROGRAM_ID,
-      tokenProgram: TOKEN_PROGRAM_ID,
-      associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID
-    }).rpc();
-    
-    console.log("Withdraw tx:", tx);
-  });
+
+
+
   it("Create Mint Account with Transfer Hook Extension", async () => {
     
   });

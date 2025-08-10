@@ -75,7 +75,7 @@ export default function CreatePool() {
     try {
       new PublicKey(mintX);
     } catch (e) {
-      return toast({ 
+      return toast({  
         title: "Invalid Token-2022 Mint", 
         description: "The Token-2022 mint address is not a valid Solana public key",
         variant: "destructive" 
