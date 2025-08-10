@@ -30,20 +30,17 @@ import { BN } from "bn.js";
 import { expect } from "chai";
 
 describe("Comprehensive AMM + Transfer Hook Test", () => {
-  // Setup providers and programs
   const provider = anchor.AnchorProvider.env();
   anchor.setProvider(provider);
 
   const program = anchor.workspace.amm as Program<Amm>;
   const transferHookProgram = anchor.workspace.transferHook as Program<TransferHook>;
 
-  // Test accounts
   let payer: Keypair;
   let user: Keypair;
   let tokenMint: Keypair;
   let connection = provider.connection;
 
-  // AMM accounts
   let config: PublicKey;
   let lpToken: PublicKey;
   let vault: PublicKey;
@@ -51,57 +48,38 @@ describe("Comprehensive AMM + Transfer Hook Test", () => {
   let wsolVault: PublicKey;
   let extraAccountMetaList: PublicKey;
 
-  // User token accounts
   let userTokenAccount: PublicKey;
   let userWsolAccount: PublicKey;
   let userLpAccount: PublicKey;
 
-  // Transfer hook accounts
   let delegatePda: PublicKey;
   let delegateWsolAta: PublicKey;
 
-  // Test configuration
   const decimals = 9;
-  const seed = new BN(Date.now()); // Unique seed for this test run
-  const feeBps = 300; // 3% fee
-  const initialTokenSupply = new BN(1000 * 10 ** decimals); // 1000 tokens
-  const initialSolAmount = new BN(10 * LAMPORTS_PER_SOL); // 10 SOL
+  const seed = new BN(Date.now());
+  const feeBps = 300;
+  const initialTokenSupply = new BN(1000 * 10 ** decimals);
+  const initialSolAmount = new BN(10 * LAMPORTS_PER_SOL);
 
   before(async () => {
-    console.log("🚀 Starting comprehensive AMM + Transfer Hook test...");
-    
-    // Create fresh keypairs for testing
     payer = Keypair.generate();
     user = Keypair.generate();
     tokenMint = Keypair.generate();
 
-    // Airdrop SOL to test accounts
-    console.log("💰 Airdropping SOL to test accounts...");
     await Promise.all([
       connection.requestAirdrop(payer.publicKey, 20 * LAMPORTS_PER_SOL),
       connection.requestAirdrop(user.publicKey, 20 * LAMPORTS_PER_SOL)
     ]);
 
-    // Wait for airdrops to confirm
     await new Promise(resolve => setTimeout(resolve, 2000));
-
-    console.log("✅ Test setup complete");
-    console.log(`Payer: ${payer.publicKey.toBase58()}`);
-    console.log(`User: ${user.publicKey.toBase58()}`);
-    console.log(`Token Mint: ${tokenMint.publicKey.toBase58()}`);
-    console.log(`AMM Seed: ${seed.toString()}`);
   });
 
   it("1. Create Token-2022 with Transfer Hook", async () => {
-    console.log("\n🔨 Creating Token-2022 with transfer hook...");
-
-    // Derive transfer hook delegate PDA
     [delegatePda] = PublicKey.findProgramAddressSync(
       [Buffer.from("delegate")],
       transferHookProgram.programId
     );
 
-    // Get delegate's WSOL ATA
     delegateWsolAta = getAssociatedTokenAddressSync(
       NATIVE_MINT_2022,
       delegatePda,
@@ -109,11 +87,9 @@ describe("Comprehensive AMM + Transfer Hook Test", () => {
       TOKEN_2022_PROGRAM_ID
     );
 
-    // Calculate space for Token-2022 mint with transfer hook extension
     const extensions = [ExtensionType.TransferHook];
     const mintLen = getMintLen(extensions);
 
-    // Create mint account
     const createMintTx = new Transaction().add(
       SystemProgram.createAccount({
         fromPubkey: payer.publicKey,
@@ -138,9 +114,7 @@ describe("Comprehensive AMM + Transfer Hook Test", () => {
     );
 
     await sendAndConfirmTransaction(connection, createMintTx, [payer, tokenMint]);
-    console.log(`✅ Token-2022 mint created: ${tokenMint.publicKey.toBase58()}`);
 
-    // Create user's token account and mint tokens
     userTokenAccount = getAssociatedTokenAddressSync(
       tokenMint.publicKey,
       user.publicKey,
@@ -168,9 +142,7 @@ describe("Comprehensive AMM + Transfer Hook Test", () => {
     );
 
     await sendAndConfirmTransaction(connection, createUserAccountTx, [payer]);
-    console.log(`✅ Minted ${initialTokenSupply} tokens to user`);
 
-    // Verify token account balance
     const userTokenBalance = await getAccount(
       connection,
       userTokenAccount,
@@ -181,15 +153,11 @@ describe("Comprehensive AMM + Transfer Hook Test", () => {
   });
 
   it("2. Initialize Transfer Hook Extra Account Meta List", async () => {
-    console.log("\n🔗 Initializing transfer hook extra account meta list...");
-
-    // Derive extra account meta list PDA
     [extraAccountMetaList] = PublicKey.findProgramAddressSync(
       [Buffer.from("extra-account-metas"), tokenMint.publicKey.toBuffer()],
       transferHookProgram.programId
     );
 
-    // Initialize extra account meta list
     await transferHookProgram.methods
       .initializeExtraAccountMetaList()
       .accountsStrict({
@@ -205,14 +173,9 @@ describe("Comprehensive AMM + Transfer Hook Test", () => {
       })
       .signers([payer])
       .rpc();
-
-    console.log(`✅ Extra account meta list initialized: ${extraAccountMetaList.toBase58()}`);
   });
 
   it("3. Prepare Transfer Hook Fee System", async () => {
-    console.log("\n💰 Setting up transfer hook fee system...");
-
-    // Create and fund delegate's WSOL account
     userWsolAccount = getAssociatedTokenAddressSync(
       NATIVE_MINT_2022,
       user.publicKey,
@@ -220,7 +183,6 @@ describe("Comprehensive AMM + Transfer Hook Test", () => {
       TOKEN_2022_PROGRAM_ID
     );
 
-    // Create user's WSOL account and fund it
     const createWsolTx = new Transaction().add(
       createAssociatedTokenAccountInstruction(
         payer.publicKey,
@@ -233,32 +195,27 @@ describe("Comprehensive AMM + Transfer Hook Test", () => {
       SystemProgram.transfer({
         fromPubkey: payer.publicKey,
         toPubkey: userWsolAccount,
-        lamports: LAMPORTS_PER_SOL // 1 SOL for fees
+        lamports: LAMPORTS_PER_SOL
       })
     );
 
     await sendAndConfirmTransaction(connection, createWsolTx, [payer]);
 
-    // Approve delegate to spend user's WSOL
     const approveTx = new Transaction().add(
       createApproveInstruction(
         userWsolAccount,
         delegatePda,
         user.publicKey,
-        BigInt(LAMPORTS_PER_SOL), // Approve 1 SOL worth of fees
+        BigInt(LAMPORTS_PER_SOL),
         [],
         TOKEN_2022_PROGRAM_ID
       )
     );
 
     await sendAndConfirmTransaction(connection, approveTx, [user]);
-    console.log(`✅ Delegate approved to spend WSOL for fees`);
   });
 
   it("4. Initialize AMM Pool", async () => {
-    console.log("\n🏊 Initializing AMM pool...");
-
-    // Derive AMM PDAs
     [config] = PublicKey.findProgramAddressSync(
       [Buffer.from("config"), seed.toArrayLike(Buffer, "le", 8)],
       program.programId
@@ -274,7 +231,6 @@ describe("Comprehensive AMM + Transfer Hook Test", () => {
       program.programId
     );
 
-    // Derive vaults
     vault = getAssociatedTokenAddressSync(
       tokenMint.publicKey,
       config,
@@ -289,13 +245,6 @@ describe("Comprehensive AMM + Transfer Hook Test", () => {
       TOKEN_2022_PROGRAM_ID
     );
 
-    console.log(`Config PDA: ${config.toBase58()}`);
-    console.log(`LP Token: ${lpToken.toBase58()}`);
-    console.log(`Token Vault: ${vault.toBase58()}`);
-    console.log(`WSOL Vault: ${wsolVault.toBase58()}`);
-    console.log(`SOL Vault: ${solVault.toBase58()}`);
-
-    // Initialize the AMM pool
     await program.methods
       .initialize(seed, feeBps, payer.publicKey)
       .accountsStrict({
@@ -315,9 +264,6 @@ describe("Comprehensive AMM + Transfer Hook Test", () => {
       .signers([payer])
       .rpc();
 
-    console.log(`✅ AMM pool initialized successfully`);
-
-    // Verify pool configuration
     const poolConfig = await program.account.config.fetch(config);
     expect(poolConfig.seed.toString()).to.equal(seed.toString());
     expect(poolConfig.fee).to.equal(feeBps);
@@ -325,14 +271,11 @@ describe("Comprehensive AMM + Transfer Hook Test", () => {
   });
 
   it("5. Deposit Liquidity to Pool", async () => {
-    console.log("\n💧 Depositing liquidity to pool...");
+    const tokenAmount = new BN(100 * 10 ** decimals);
+    const solAmount = new BN(5 * LAMPORTS_PER_SOL);
+    const maxToken = new BN(110 * 10 ** decimals);
+    const maxSol = new BN(5.5 * LAMPORTS_PER_SOL);
 
-    const tokenAmount = new BN(100 * 10 ** decimals); // 100 tokens
-    const solAmount = new BN(5 * LAMPORTS_PER_SOL); // 5 SOL
-    const maxToken = new BN(110 * 10 ** decimals); // 10% slippage
-    const maxSol = new BN(5.5 * LAMPORTS_PER_SOL); // 10% slippage
-
-    // Create user's LP token account
     userLpAccount = getAssociatedTokenAddressSync(
       lpToken,
       user.publicKey,
@@ -340,7 +283,6 @@ describe("Comprehensive AMM + Transfer Hook Test", () => {
       TOKEN_PROGRAM_ID
     );
 
-    // Get initial balances
     const initialTokenBalance = await getAccount(
       connection,
       userTokenAccount,
@@ -349,10 +291,6 @@ describe("Comprehensive AMM + Transfer Hook Test", () => {
     );
     const initialSolBalance = await connection.getBalance(user.publicKey);
 
-    console.log(`Initial token balance: ${initialTokenBalance.amount}`);
-    console.log(`Initial SOL balance: ${initialSolBalance / LAMPORTS_PER_SOL} SOL`);
-
-    // Deposit liquidity
     await program.methods
       .deposit(solAmount, tokenAmount, maxSol, maxToken)
       .accountsStrict({
@@ -380,9 +318,6 @@ describe("Comprehensive AMM + Transfer Hook Test", () => {
       .signers([user])
       .rpc();
 
-    console.log(`✅ Liquidity deposited successfully`);
-
-    // Verify LP tokens were minted
     const userLpBalance = await getAccount(
       connection,
       userLpAccount,
@@ -390,9 +325,7 @@ describe("Comprehensive AMM + Transfer Hook Test", () => {
       TOKEN_PROGRAM_ID
     );
     expect(Number(userLpBalance.amount)).to.be.greaterThan(0);
-    console.log(`LP tokens received: ${userLpBalance.amount}`);
 
-    // Verify vault balances
     const vaultTokenBalance = await getAccount(
       connection,
       vault,
@@ -400,9 +333,6 @@ describe("Comprehensive AMM + Transfer Hook Test", () => {
       TOKEN_2022_PROGRAM_ID
     );
     const vaultSolBalance = await connection.getBalance(solVault);
-
-    console.log(`Vault token balance: ${vaultTokenBalance.amount}`);
-    console.log(`Vault SOL balance: ${vaultSolBalance / LAMPORTS_PER_SOL} SOL`);
 
     expect(Number(vaultTokenBalance.amount)).to.be.greaterThan(0);
     expect(vaultSolBalance).to.be.greaterThan(0);
@@ -601,7 +531,7 @@ describe("Comprehensive AMM + Transfer Hook Test", () => {
       .signers([user])
       .rpc();
 
-    console.log(`✅ Liquidity withdrawn successfully`);
+
 
     // Verify LP tokens were burned
     const finalLpBalance = await getAccount(
@@ -649,24 +579,5 @@ describe("Comprehensive AMM + Transfer Hook Test", () => {
     expect(Number(delegateFeeBalance.amount)).to.be.greaterThan(expectedMinimumFees);
   });
 
-  after(async () => {
-    console.log("\n🎉 All tests completed successfully!");
-    console.log("\nTest Summary:");
-    console.log("✅ Token-2022 with transfer hook created");
-    console.log("✅ Transfer hook extra account meta list initialized");
-    console.log("✅ Transfer hook fee system configured");
-    console.log("✅ AMM pool initialized");
-    console.log("✅ Liquidity deposited to pool");
-    console.log("✅ Token-to-SOL swap executed");
-    console.log("✅ SOL-to-token swap executed");
-    console.log("✅ Liquidity withdrawn from pool");
-    console.log("✅ Transfer hook fees collected and verified");
-    
-    console.log("\n📊 Final Account States:");
-    console.log(`Config: ${config.toBase58()}`);
-    console.log(`LP Token: ${lpToken.toBase58()}`);
-    console.log(`Token Mint: ${tokenMint.publicKey.toBase58()}`);
-    console.log(`Transfer Hook Program: ${transferHookProgram.programId.toBase58()}`);
-    console.log(`AMM Program: ${program.programId.toBase58()}`);
-  });
+ 
 });
